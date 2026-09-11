@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>お呼び出し番号</title>
+<style>
+  body { font-family: sans-serif; text-align: center; background-color: #f0f8ff; padding: 30px 15px; color: #333; margin: 0; }
+  .title { font-size: 1.3em; font-weight: bold; margin-bottom: 10px; color: #444; }
+  .number-box { background: #fff; border-radius: 15px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); display: inline-block; min-width: 220px; margin-bottom: 30px; }
+  .number { font-size: 4.5em; font-weight: bold; color: #d32f2f; margin: 5px 0; display: inline-block; }
+  .suffix { font-size: 1.5em; display: inline-block; }
+  
+  .sub-title { font-size: 1.1em; font-weight: bold; color: #555; margin-bottom: 10px; }
+  .sub-number-box { background: #fff; border-radius: 12px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); display: inline-block; min-width: 180px; margin-bottom: 30px; border: 2px solid #e0e0e0; }
+  .sub-number { font-size: 3em; font-weight: bold; color: #1976D2; margin: 0; display: inline-block; }
+  
+  .warning-text { font-size: 0.95em; color: #d32f2f; font-weight: bold; background: #ffebee; padding: 15px; border-radius: 8px; margin: 10px auto; max-width: 90%; line-height: 1.5; }
+  .loading { color: #888; font-size: 0.8em; margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<div class="title">次に呼ばれる番号</div>
+<div class="number-box">
+  <div id="nextNumber" class="number">--</div><span id="suffix1" class="suffix">番</span>
+</div>
+
+<div class="sub-title">ご来室いただきたい番号（次にお呼びする番号）</div>
+<div class="sub-number-box">
+  <div id="nextNextNumber" class="sub-number">--</div><span id="suffix2" class="suffix" style="font-size: 1.2em;">番</span>
+</div>
+
+<div class="warning-text">
+  ⚠️ お呼びした際にご来室いただけない場合は、キャンセル扱いとさせていただきます。
+</div>
+
+<div id="updateTime" class="loading">読込中...</div>
+
+<script>
+// ★★★ GASのURLをここに貼り付けてください ★★★
+const GAS_URL = "https://script.google.com/macros/s/AKfycbylwL6UHy06vF8blZkK_eDCf0XJtVity_NrDzjg6-YUEh_a-cNeGB9ufGUUvgWXWAQz4g/exec";
+
+function fetchNextNumber() {
+  fetch(GAS_URL)
+    .then(res => res.json())
+    .then(data => {
+      const activeData = data.filter(item => item.status !== "キャンセル");
+      
+      let lastCalled = 0;
+      activeData.forEach(item => {
+        if (item.checkIn && item.checkIn !== "未確認" && item.checkIn !== "") {
+          let num = parseInt(item.number, 10);
+          if (num > lastCalled) lastCalled = num;
+        }
+      });
+
+      const waitings = activeData.filter(item => parseInt(item.number, 10) > lastCalled);
+      
+      const nextDisplay = document.getElementById("nextNumber");
+      const nextNextDisplay = document.getElementById("nextNextNumber");
+      const suffix1 = document.getElementById("suffix1");
+      const suffix2 = document.getElementById("suffix2");
+      
+      if (waitings.length > 0) {
+        waitings.sort((a, b) => parseInt(a.number, 10) - parseInt(b.number, 10));
+        
+        // 次に呼ばれる番号（1番目）
+        nextDisplay.innerText = waitings[0].number;
+        nextDisplay.style.fontSize = "4.5em";
+        suffix1.style.display = "inline-block";
+        
+        // ご来室いただきたい番号（2番目）
+        if (waitings.length > 1) {
+          nextNextDisplay.innerText = waitings[1].number;
+          nextNextDisplay.style.fontSize = "3em";
+          suffix2.style.display = "inline-block";
+        } else {
+          nextNextDisplay.innerText = "なし";
+          nextNextDisplay.style.fontSize = "2em";
+          suffix2.style.display = "none";
+        }
+      } else {
+        // 待ちなしの場合
+        nextDisplay.innerText = "お待ちなし";
+        nextDisplay.style.fontSize = "2em";
+        suffix1.style.display = "none";
+        
+        nextNextDisplay.innerText = "なし";
+        nextNextDisplay.style.fontSize = "2em";
+        suffix2.style.display = "none";
+      }
+      
+      const now = new Date();
+      document.getElementById("updateTime").innerText = 
+        "自動更新中 / 最終確認: " + String(now.getHours()).padStart(2, '0') + ":" + 
+        String(now.getMinutes()).padStart(2, '0') + ":" + 
+        String(now.getSeconds()).padStart(2, '0');
+    })
+    .catch(err => {
+      document.getElementById("updateTime").innerText = "通信エラー。再試行中...";
+    });
+}
+
+fetchNextNumber();
+setInterval(fetchNextNumber, 10000);
+</script>
+</body>
+</html>
